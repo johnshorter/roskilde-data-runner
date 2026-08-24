@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Verify a Roskilde Data Runner score</title>
+<style>
+  :root{--teal:#028090;--deep:#05413F;--mint:#02C39A;--coral:#E76F51;--ink:#0E2A2C;--line:#CFE4E2}
+  *{box-sizing:border-box}
+  body{font-family:system-ui,"Segoe UI",Roboto,sans-serif;color:var(--ink);background:#eaf4f2;margin:0;padding:32px}
+  .card{max-width:620px;margin:0 auto;background:#fff;border-radius:18px;box-shadow:0 12px 34px rgba(5,35,33,.18);padding:28px}
+  h1{font-family:"Trebuchet MS",sans-serif;color:var(--teal);margin:0 0 4px;font-size:24px}
+  p.lead{color:#456;margin:0 0 18px}
+  label{font-weight:bold;font-size:14px;display:block;margin:12px 0 4px}
+  input{width:100%;font-size:16px;padding:11px 13px;border:2px solid var(--line);border-radius:10px;outline:none}
+  input:focus{border-color:var(--teal)}
+  .mono{font-family:"Courier New",monospace}
+  button{margin-top:18px;font-family:"Trebuchet MS",sans-serif;font-weight:bold;font-size:17px;border:none;
+    background:var(--teal);color:#fff;padding:13px 24px;border-radius:12px;cursor:pointer}
+  #out{margin-top:20px;padding:16px;border-radius:12px;font-size:16px;display:none}
+  #out.ok{display:block;background:#E4F8F1;border:2px solid var(--mint)}
+  #out.bad{display:block;background:#FBE9E4;border:2px solid var(--coral)}
+  #out b{font-size:20px}
+  details{margin-top:20px;color:#567;font-size:13px}
+  code{background:#f0f6f5;padding:1px 6px;border-radius:5px}
+</style>
+</head>
+<body>
+<div class="card">
+  <h1>Verify a high-score code</h1>
+  <p class="lead">Paste the student's name and the code from their screenshot. This recomputes the code and tells you if it matches. It catches casual photo-editing; it is not cryptographically secure.</p>
+
+  <label for="name">Student name (exactly as on their card)</label>
+  <input id="name" autocomplete="off" placeholder="e.g. Freja">
+
+  <label for="code">Verification code</label>
+  <input id="code" class="mono" autocomplete="off" placeholder="RDR-HC-9IX-1YJLR3V">
+
+  <button onclick="check()">Check code</button>
+  <div id="out"></div>
+
+  <details>
+    <summary>How the code works</summary>
+    <p>The code has the form <code>RDR-[flag]-[score]-[hash]</code>.</p>
+    <ul>
+      <li><b>flag</b>: two letters. First is <code>H</code> (hard mode) or <code>N</code> (normal). Second is <code>C</code> (full campaign run) or <code>S</code> (single level).</li>
+      <li><b>score</b>: the points total, written in base-36 (so it looks scrambled). This tool decodes it back to a normal number.</li>
+      <li><b>hash</b>: a fingerprint of name + score + flag. Change any of them and the hash no longer matches.</li>
+    </ul>
+    <p>A valid <code>HC</code> code means the student earned that score in hard mode across a full campaign run — the highest-value combination.</p>
+  </details>
+</div>
+
+<script>
+"use strict";
+function hashStr(str){ var h=2166136261>>>0; for(var i=0;i<str.length;i++){ h^=str.charCodeAt(i); h=Math.imul(h,16777619)>>>0; } return h>>>0; }
+function makeCode(name, score, flag){
+  var norm=(name.trim().toLowerCase().replace(/\s+/g,"")||"anon");
+  var payload=norm+"|"+score+"|"+flag;
+  var h=hashStr(payload).toString(36).toUpperCase().padStart(7,"0").slice(0,7);
+  var sc=score.toString(36).toUpperCase();
+  return "RDR-"+flag+"-"+sc+"-"+h;
+}
+function check(){
+  var name=document.getElementById("name").value;
+  var code=document.getElementById("code").value.trim().toUpperCase();
+  var out=document.getElementById("out");
+  var m=code.match(/^RDR-([HN][CS])-([0-9A-Z]+)-([0-9A-Z]{7})$/);
+  if(!m){ out.className="bad"; out.innerHTML="<b>Not a valid code format.</b><br>Expected something like RDR-HC-9IX-1YJLR3V."; return; }
+  var flag=m[1], score=parseInt(m[2],36);
+  var expected=makeCode(name, score, flag);
+  if(expected===code){
+    var mode=flag[0]==="H"?"Hard mode":"Normal mode";
+    var run=flag[1]==="C"?"full campaign":"single level";
+    out.className="ok";
+    out.innerHTML="<b>✓ Valid code.</b><br>"+name+" scored <b>"+score.toLocaleString()+"</b> points ("+mode+", "+run+").";
+  } else {
+    out.className="bad";
+    out.innerHTML="<b>✗ Does not match.</b><br>Either the name is spelled differently than on their card, or the code/score was altered.";
+  }
+}
+</script>
+</body>
+</html>
